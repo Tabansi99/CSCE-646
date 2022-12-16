@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { FaCompressAlt, FaFileImage, FaMixer } from "react-icons/fa";
 import defaultLeftImgSrc from './images/face3.jpg'
 import defaultRightImgSrc from './images/face3_tilt.jpg'
+import { Coordinate, findSeam, getPixel, matrix, setPixel } from "./renderImage";
 
 export const SeamStitch = () => {
   const leftInputRef = useRef<HTMLInputElement>(null)
@@ -15,6 +16,9 @@ export const SeamStitch = () => {
   const [rightImageUrl, setRightImageUrl] = useState(defaultRightImgSrc);
   const [rightOriginalDimensions, setRightOriginalDimensions] = useState('')
   const [leftOriginalDimensions, setLeftOriginalDimensions] = useState('')
+  const [merged, setMerged] = useState(false)
+  const [mergedURL, setMergedURL] = useState('')
+  const [mergedDimensions, setMergedDimensions] = useState('')
 
   const LeftHandleClick = () => {
     if (leftInputRef.current){
@@ -69,7 +73,68 @@ export const SeamStitch = () => {
         return
       }
 
-      alert("SUCCESS!!!")
+      const canvas = canvasRef.current;
+
+      if (canvas) {
+        let w = leftImgRef.width
+        let h = rightImgRef.height
+
+        canvas.width = w
+        canvas.height = h
+
+        const ctxLeft = canvas.getContext('2d')
+        //const ctxRight = canvas.getContext('2d')
+
+        if (ctxLeft) {
+          ctxLeft.drawImage(leftImgRef, 0, 0, w, h)
+          const leftImg = ctxLeft.getImageData(0, 0, w, h)
+
+          const ctxRight = canvas.getContext('2d')
+          if (ctxRight) {
+            ctxRight.drawImage(rightImgRef, 0, 0, w, h)
+            const rightImg = ctxRight.getImageData(0, 0, w, h)
+
+            const energyMap: number[][] = matrix<number>(w, h, Infinity);
+
+            for (let y = 0; y < h; y += 1) {
+              for (let x = 0; x < w; x += 1) {
+                const left = getPixel(leftImg, {x, y})
+                const right = getPixel(rightImg, {x, y})
+
+                const [lR, lG, lB] = left;
+                const [rR, rG, rB] = right;
+
+                energyMap[y][x] = (lR - rR) ** 2 + (lG - rG) ** 2 + (lB - rB) ** 2
+              }
+            }
+
+            const seam = findSeam(energyMap, {w, h})
+
+            seam.forEach(({ x: seamX, y: seamY }: Coordinate) => {
+              for (let x = seamX; x < w; x += 1) {
+                const nextPixel = getPixel(rightImg, { x: x, y: seamY });
+                setPixel(leftImg, { x, y: seamY }, nextPixel);
+              }
+            })
+
+            const ctx = canvas.getContext('2d')
+
+            if (ctx) {
+              ctx.putImageData(leftImg, 0, 0, 0, 0, w, h)
+            }
+
+            const type = 'Image/png'
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const newURL = URL.createObjectURL(blob)
+                setMergedURL(newURL)
+                setMergedDimensions(w + ' x ' + h)
+              }
+            }, type)
+
+          }
+        }
+      }
     }
   }
 
@@ -139,6 +204,7 @@ export const SeamStitch = () => {
       <Box margin={8} textAlign={'center'}>
         <Button
           onClick={(e) => {
+            setMerged(true)
             Merge(e)
           }}
         >
@@ -146,6 +212,22 @@ export const SeamStitch = () => {
           <FaMixer />
         </Button>
       </Box>
+
+      <Box textAlign={'center'}>
+        <canvas hidden ref={canvasRef} />
+      </Box>
+
+      <Box textAlign={'center'}>
+        <Text fontSize={'3xl'}><b>Merged Image:</b></Text>
+        <Image marginLeft={'auto'} marginRight={'auto'} display={'block'} src={mergedURL} />
+        <Text><b>Merged Image Dimensions (W x H):</b> {mergedDimensions}</Text>
+      </Box>
+      {/* {merged ?
+        :
+        <Box>
+
+        </Box>
+      } */}
     </Box>
   )
 }

@@ -41,7 +41,7 @@ const getPixelDeleteEnergy = (): number => {
   return -1 * multiplier * numNeighbors * maxSeamSize * numColors * (maxColorDistance ** 2);
 };
 
-const matrix = <T>(w: number, h: number, filler: T): T[][] => {
+export const matrix = <T>(w: number, h: number, filler: T): T[][] => {
   return new Array(h)
     .fill(null)
     .map(() => {
@@ -123,7 +123,7 @@ const calcEnergy = (img: ImageData, { w, h }: Size): EnergyMap => {
   return energyMap;
 };
 
-const findSeam = (energyMap: EnergyMap, { w, h }: Size): Seam => {
+export const findSeam = (energyMap: EnergyMap, { w, h }: Size): Seam => {
   const seamsMap: (SeamMeta | null)[][] = matrix<SeamMeta | null>(w, h, null);
 
   // Populate the first row of the map.
